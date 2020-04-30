@@ -2,3 +2,5 @@ tyler/model_checkpoints/
 tyler/model_checkpoints/*
 tyler/.ipynb_checkpoints/
 tyler/.ipynb_checkpoints/*
+tyler/logs/
+tyler/logs/*
