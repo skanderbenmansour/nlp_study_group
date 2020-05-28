@@ -6,3 +6,5 @@ tyler/logs/
 tyler/logs/*
 skander/.ipynb_checkpoints/
 skander/.ipynb_checkpoints/*
+.DS_Store
+tyler/.DS_Store
