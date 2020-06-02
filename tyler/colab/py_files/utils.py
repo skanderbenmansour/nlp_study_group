@@ -15,10 +15,15 @@ from torch.utils.data import Dataset, DataLoader
 from gensim.models import KeyedVectors
 
 import zipfile
+import pickle
 from datetime import datetime
 from glob import glob
 import os
 import json
+import random
+
+from torch.nn.utils.rnn import pack_sequence,pad_sequence,pack_padded_sequence,pad_packed_sequence
+from torch.utils.data import TensorDataset, DataLoader
 
 def process_review(review):
     chars = ['/','\\','>','<','-','br']
@@ -74,13 +79,16 @@ def make_wv_input(sentence, word2idx, glove):
     ten = torch.tensor(vec,dtype=torch.float)
     return ten
 
-def prep_input(sentence, word2idx, glove, label, device):
-    vec = make_wv_input(sentence, word2idx, glove)
-
+def label_to_tensor(label):
     if label == 0:
         target = torch.tensor([1, 0], dtype=torch.float)
     else:
         target = torch.tensor([0, 1], dtype=torch.float)
+    return target
+
+def prep_input(sentence, word2idx, glove, label, device):
+    vec = make_wv_input(sentence, word2idx, glove)
+    target = label_to_tensor(label)
 
     vec, target = vec.to(device), target.to(device)
 
@@ -113,3 +121,126 @@ def make_loss_plot(loss_history,val_loss_min,model_dir):
     fig.set_size_inches(20, 7)
     fig_path = os.path.join(model_dir, 'loss.png')
     plt.savefig(fig_path)
+
+def load_processed_reviews(data_path):
+    pickle_path = os.path.join(data_path, 'processed_data.pickle')
+    with open(pickle_path, 'rb') as f:
+        train_data, test_data, val_data = pickle.load(f)
+    return train_data, test_data, val_data
+
+
+def load_and_process_stanford_data(data_path, save=False):
+    zf = zipfile.ZipFile(data_path + 'train.csv.zip')
+    train = pd.read_csv(zf.open('train.csv'))
+
+    zf = zipfile.ZipFile(data_path + 'test.csv.zip')
+    test_val = pd.read_csv(zf.open('test.csv'))
+
+    val = pd.concat([test_val[:2500], test_val[12500:12500 + 2500]])
+    test = pd.concat([test_val[2500:12500], test_val[12500 + 2500:]])
+
+    processed_list = []
+
+    for data in [train,test,val]:
+        labels = list(data.sentiment.values)
+        reviews = list(data.review.values)
+
+        all_words = [process_review(review) for review in tqdm(reviews)]
+
+        processed_data = list(zip(all_words, labels))
+        random.shuffle(processed_data)
+        processed_list.append(processed_data)
+
+    train_data, test_data, val_data = processed_list
+
+    if save:
+        pickle_path = os.path.join(data_path, 'processed_data.pickle')
+        with open(pickle_path, 'wb') as f:
+            pickle.dump((train_data, test_data, val_data), f)
+
+    return train_data, test_data, val_data
+
+
+def load_and_process_w2v_data(data_path, save=False):
+    zf = zipfile.ZipFile(data_path + 'labeledTrainData.tsv.zip')
+    df = pd.read_csv(zf.open('labeledTrainData.tsv'),sep='\t')
+    train = df[:15000]
+    val = df[15000:20000]
+    test = df[20000:]
+
+    processed_list = []
+
+    for data in [train,test,val]:
+        labels = list(data.sentiment.values)
+        reviews = list(data.review.values)
+
+        all_words = [process_review(review) for review in tqdm(reviews)]
+
+        processed_data = list(zip(all_words, labels))
+        random.shuffle(processed_data)
+        processed_list.append(processed_data)
+
+    train_data, test_data, val_data = processed_list
+
+    if save:
+        pickle_path = os.path.join(data_path, 'processed_data.pickle')
+        with open(pickle_path, 'wb') as f:
+            pickle.dump((train_data, test_data, val_data), f)
+
+    return train_data, test_data, val_data
+
+def load_tensor_data(data,word2idx):
+    idx_tensors = []
+    label_tensors = []
+    for sentence, label in data:
+        idx_tensors.append(sentence_to_idx(sentence,word2idx))
+        label_tensors.append(label_to_tensor(label))
+
+    lengths = [ten.shape[0] for ten in idx_tensors]
+    lengths_tensor = torch.tensor(lengths)
+    label_tensor = torch.stack(label_tensors)
+
+    padded = pad_sequence(idx_tensors, padding_value=99999, batch_first=True)
+
+    tensor_data = TensorDataset(padded, lengths_tensor, label_tensor)
+    return tensor_data
+
+def load_all_tensor_data(train,test,val,batch_size,word2idx):
+    train_dataset = load_tensor_data(train,word2idx)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+    test_dataset = load_tensor_data(test,word2idx)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+
+    val_dataset = load_tensor_data(val,word2idx)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+
+    return train_loader,test_loader,val_loader
+
+def sentence_to_idx(sentence,word2idx,max_len=1000):
+    idx = [word2idx[word] for word in sentence if word in word2idx]
+    return torch.tensor(idx[:max_len])
+
+def predict_sentence_batch(sentence, word2idx, model, device, is_cuda):
+    idx_tensors = []
+    idx_tensors.append(sentence_to_idx(sentence, word2idx))
+    idx_tensors.extend([torch.zeros(1)] * (model.batch_size - 1))
+
+    lengths_list = [ten.shape[0] for ten in idx_tensors]
+    lengths = torch.tensor(lengths_list)
+
+    inputs = pad_sequence(idx_tensors, padding_value=99999, batch_first=True)
+
+
+    h = model.init_hidden()
+    inputs, lengths = inputs.to(device), lengths.to(device)
+    probs, h = model(inputs, lengths, h)
+
+    first_sentence_prob = probs[0]
+
+    if is_cuda:
+        pred = first_sentence_prob.argmax().cpu().numpy()
+    else:
+        pred = first_sentence_prob.argmax().detach().numpy()
+
+    return pred
