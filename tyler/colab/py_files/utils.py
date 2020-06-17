@@ -25,6 +25,10 @@ import random
 from torch.nn.utils.rnn import pack_sequence,pad_sequence,pack_padded_sequence,pad_packed_sequence
 from torch.utils.data import TensorDataset, DataLoader
 
+import sys
+sys.path.append('../')
+from py_files import models
+
 def process_review(review):
     chars = ['/','\\','>','<','-','br']
     chars.extend('1 2 3 4 5 6 7 8 9 0'.split())
@@ -244,3 +248,60 @@ def predict_sentence_batch(sentence, word2idx, model, device, is_cuda):
         pred = first_sentence_prob.argmax().detach().numpy()
 
     return pred
+
+
+def create_inference_model(model_version,model_name,glove,is_cuda,device):
+
+    model_dir = os.path.join('/content/drive/My Drive/colab_data/model_checkpoints/',model_version)
+    param_path = os.path.join(model_dir,'param.json')
+    with open(param_path,'r') as f:
+        params = json.load(f)
+
+    num_labels = params.get('num_labels')
+    vocab_size = params.get('vocab_size')
+    embedding_dim = params.get('embedding_dim')
+    num_layers = params.get('num_layers')
+    hidden = params.get('hidden')
+    p_dropout = params.get('p_dropout')
+    batch_size = params.get('batch_size')
+
+    model = models.lstm_clf_batch(num_labels, vocab_size, embedding_dim, num_layers, hidden, batch_size, glove.vectors,
+                                  device, p_dropout)
+    batch_size = 1
+
+    inf_model = models.lstm_clf_batch(num_labels, vocab_size, embedding_dim, num_layers, hidden, batch_size, glove.vectors,
+                                  device, p_dropout)
+    inf_model.to(device)
+
+    load_path = os.path.join(model_dir, model_name)
+    if is_cuda:
+        model.load_state_dict(torch.load(load_path))
+    else:
+        model.load_state_dict(torch.load(load_path, map_location=torch.device('cpu')))
+
+    inf_model.load_state_dict(model.state_dict())
+    return inf_model
+
+def predict_from_inf_model(sentence, word2idx, inf_model, device, is_cuda, return_prob=False):
+    idx_tensors = []
+    idx_tensors.append(sentence_to_idx(sentence, word2idx))
+
+    lengths_list = [ten.shape[0] for ten in idx_tensors]
+    lengths = torch.tensor(lengths_list)
+
+    inputs = pad_sequence(idx_tensors, padding_value=99999, batch_first=True)
+
+    h = inf_model.init_hidden()
+    inputs, lengths = inputs.to(device), lengths.to(device)
+    probs, h = inf_model(inputs, lengths, h)
+
+    prob = probs[0]
+
+    if return_prob:
+        if is_cuda:
+            return prob.cpu().numpy()
+        return prob.detach().numpy()
+
+    if is_cuda:
+        return prob.argmax().cpu().numpy()
+    return prob.argmax().detach().numpy()
