@@ -1,0 +1,12 @@
+{
+    "batch_size": 100,
+    "device_name": "Tesla K80",
+    "embedding_dim": 300,
+    "hidden": 50,
+    "is_cuda": true,
+    "lr": 0.001,
+    "num_labels": 2,
+    "num_layers": 1,
+    "p_dropout": 0.3,
+    "vocab_size": 100000
+}

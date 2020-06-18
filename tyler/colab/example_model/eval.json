@@ -1,0 +1,14 @@
+{
+    "test": {
+        "acc": 90.24,
+        "mean_loss": 0.242
+    },
+    "train": {
+        "acc": 92.48,
+        "mean_loss": 0.198
+    },
+    "val": {
+        "acc": 90.04,
+        "mean_loss": 0.241
+    }
+}

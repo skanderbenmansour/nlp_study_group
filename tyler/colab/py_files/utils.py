@@ -299,9 +299,9 @@ def predict_from_inf_model(sentence, word2idx, inf_model, device, is_cuda, retur
 
     if return_prob:
         if is_cuda:
-            return prob.cpu().numpy()
+            return prob.detach().cpu().numpy()
         return prob.detach().numpy()
 
     if is_cuda:
-        return prob.argmax().cpu().numpy()
+        return prob.argmax().detach().cpu().numpy()
     return prob.argmax().detach().numpy()
