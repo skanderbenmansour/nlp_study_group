@@ -18,3 +18,5 @@ hidden = 50
 num_layers = 1
 
 p_dropout = 0.3
+
+learning rate = 0.001
