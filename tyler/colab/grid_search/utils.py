@@ -42,29 +42,28 @@ def process_review(review):
     tokens = [t.lower() for t in tokens]
     return tokens
 
-def get_run_version():
-    model_dir = '/content/drive/My Drive/colab_data/model_checkpoints/*'
+def get_run_version(checkpoint_dir='/content/drive/My Drive/colab_data/model_checkpoints'):
+    model_dir = os.path.join(model_checkpoints,'*')
   
     files = glob(model_dir)
     return f'v{str(len(files))}'
 
-def setup_dir(version):
-    model_dir = f'/content/drive/My Drive/colab_data/model_checkpoints/{version}'
+def setup_dir(version,checkpoint_dir='/content/drive/My Drive/colab_data/model_checkpoints'):
+    model_dir = os.path.join(model_checkpoints, f'{version}')
     os.mkdir(model_dir)
-    log_dir = f'/content/drive/My Drive/colab_data/model_checkpoints/{version}/logs'
+    log_dir = os.path.join(model_checkpoints, f'{version}/logs')
     os.mkdir(log_dir)
     return model_dir,log_dir
 
-def save_params(version,params):
-    param_path = f'/content/drive/My Drive/colab_data/model_checkpoints/{version}/param.json'
+def save_params(version,params,checkpoint_dir='/content/drive/My Drive/colab_data/model_checkpoints'):
+    param_path = os.path.join(model_checkpoints, f'{version}/param.json')
     with open(param_path, 'w') as f:
         json.dump(params, f, indent=4, sort_keys=True)
 
-def save_eval(version,results):
-    eval_path = f'/content/drive/My Drive/colab_data/model_checkpoints/{version}/eval.json'
+def save_eval(version,results,checkpoint_dir='/content/drive/My Drive/colab_data/model_checkpoints'):
+    eval_path = os.path.join(model_checkpoints, f'{version}/eval.json')
     with open(eval_path, 'w') as f:
         json.dump(results, f, indent=4, sort_keys=True)
-
 
 def predict_sentence(sentence, word2idx, glove, model, device):
     vec = make_wv_input(sentence, word2idx, glove)
@@ -253,9 +252,8 @@ def predict_sentence_batch(sentence, word2idx, model, device, is_cuda):
     return pred
 
 
-def create_inference_model(model_version,model_name,glove,is_cuda,device):
-
-    model_dir = os.path.join('/content/drive/My Drive/colab_data/model_checkpoints/',model_version)
+def create_inference_model(model_version,model_name,glove,is_cuda,device,checkpoint_dir='/content/drive/My Drive/colab_data/model_checkpoints'):
+    model_dir = os.path.join(checkpoint_dir,model_version)
     param_path = os.path.join(model_dir,'param.json')
     with open(param_path,'r') as f:
         params = json.load(f)
@@ -439,8 +437,9 @@ def train_model(model_dir,params,train_loader,val_loader,model,model_version,dev
 
     return loss_history,val_loss_min
 
-def load_model_checkpoint(model_version,is_cuda,model):
-    model_dir = f'/content/drive/My Drive/colab_data/model_checkpoints/{model_version}'
+def load_model_checkpoint(model_version,is_cuda,model,checkpoint_dir='/content/drive/My Drive/colab_data/model_checkpoints'):
+    model_dir = os.path.join(checkpoint_dir,model_version)
+
     load_path = os.path.join(model_dir, 'glove_lstm_batch.pt')
 
     if is_cuda:
