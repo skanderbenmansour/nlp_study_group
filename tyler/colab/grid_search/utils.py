@@ -43,25 +43,25 @@ def process_review(review):
     return tokens
 
 def get_run_version(checkpoint_dir='/content/drive/My Drive/colab_data/model_checkpoints'):
-    model_dir = os.path.join(model_checkpoints,'*')
+    model_dir = os.path.join(checkpoint_dir,'*')
   
     files = glob(model_dir)
     return f'v{str(len(files))}'
 
 def setup_dir(version,checkpoint_dir='/content/drive/My Drive/colab_data/model_checkpoints'):
-    model_dir = os.path.join(model_checkpoints, f'{version}')
+    model_dir = os.path.join(checkpoint_dir, f'{version}')
     os.mkdir(model_dir)
-    log_dir = os.path.join(model_checkpoints, f'{version}/logs')
+    log_dir = os.path.join(checkpoint_dir, f'{version}/logs')
     os.mkdir(log_dir)
     return model_dir,log_dir
 
 def save_params(version,params,checkpoint_dir='/content/drive/My Drive/colab_data/model_checkpoints'):
-    param_path = os.path.join(model_checkpoints, f'{version}/param.json')
+    param_path = os.path.join(checkpoint_dir, f'{version}/param.json')
     with open(param_path, 'w') as f:
         json.dump(params, f, indent=4, sort_keys=True)
 
 def save_eval(version,results,checkpoint_dir='/content/drive/My Drive/colab_data/model_checkpoints'):
-    eval_path = os.path.join(model_checkpoints, f'{version}/eval.json')
+    eval_path = os.path.join(checkpoint_dir, f'{version}/eval.json')
     with open(eval_path, 'w') as f:
         json.dump(results, f, indent=4, sort_keys=True)
 
